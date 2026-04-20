@@ -1,0 +1,495 @@
+id: smard_load_gcs_to_bigquery
+namespace: energiewende
+
+description: |
+  GCS Parquet → BigQuery
+  Using native BQ plugin, no Docker, minimal disk usage
+
+inputs:
+  - id: year
+    type: STRING
+    defaults: "2019"
+
+tasks:
+
+  # ── Generation: Direct load for each energy type ─────────────────
+  - id: delete_generation_year
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      DELETE FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      WHERE EXTRACT(YEAR FROM DATE(timestamp_utc)) = {{ inputs.year }}
+
+  - id: load_biomass
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_biomass_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=biomass/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_biomass
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'biomass',
+        biomass,
+        'renewable',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_biomass_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_biomass
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_biomass_{{ inputs.year }}`"
+
+  # ── Repeat above three steps, changing energy type ───────────────────────────
+  - id: load_hydropower
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydropower_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=hydropower/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_hydropower
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'hydropower', hydropower, 'renewable',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydropower_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_hydropower
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydropower_{{ inputs.year }}`"
+
+  - id: load_wind_offshore
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_offshore_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=wind_offshore/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_wind_offshore
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'wind_offshore', wind_offshore, 'renewable',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_offshore_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_wind_offshore
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_offshore_{{ inputs.year }}`"
+
+  - id: load_wind_onshore
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_onshore_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=wind_onshore/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_wind_onshore
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'wind_onshore', wind_onshore, 'renewable',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_onshore_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_wind_onshore
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_wind_onshore_{{ inputs.year }}`"
+
+  - id: load_photovoltaics
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_photovoltaics_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=photovoltaics/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_photovoltaics
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'photovoltaics', photovoltaics, 'renewable',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_photovoltaics_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_photovoltaics
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_photovoltaics_{{ inputs.year }}`"
+
+  - id: load_other_renewable
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_renewable_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=other_renewable/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_other_renewable
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'other_renewable', other_renewable, 'other',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_renewable_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_other_renewable
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_renewable_{{ inputs.year }}`"
+
+  - id: load_nuclear
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    allowFailure: true
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_nuclear_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=nuclear/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_nuclear
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'nuclear', nuclear, 'other',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_nuclear_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL AND nuclear IS NOT NULL
+    allowFailure: true
+
+  - id: drop_tmp_nuclear
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_nuclear_{{ inputs.year }}`"
+
+  - id: load_lignite
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_lignite_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=lignite/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_lignite
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'lignite', lignite, 'fossil',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_lignite_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_lignite
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_lignite_{{ inputs.year }}`"
+
+  - id: load_hard_coal
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hard_coal_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=hard_coal/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_hard_coal
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'hard_coal', hard_coal, 'fossil',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hard_coal_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_hard_coal
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hard_coal_{{ inputs.year }}`"
+
+  - id: load_fossil_gas
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_fossil_gas_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=fossil_gas/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_fossil_gas
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'fossil_gas', fossil_gas, 'fossil',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_fossil_gas_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_fossil_gas
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_fossil_gas_{{ inputs.year }}`"
+
+  - id: load_hydro_pumped_storage
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydro_pumped_storage_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=hydro_pumped_storage/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_hydro_pumped_storage
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'hydro_pumped_storage', hydro_pumped_storage, 'other',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydro_pumped_storage_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_hydro_pumped_storage
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_hydro_pumped_storage_{{ inputs.year }}`"
+
+  - id: load_other_conventional
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_conventional_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/generation/type=other_conventional/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_other_conventional
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_generation`
+      (timestamp_utc, energy_type, value_mwh, category, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        'other_conventional', other_conventional, 'other',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_conventional_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_other_conventional
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_other_conventional_{{ inputs.year }}`"
+
+  # ── Consumption ────────────────────────────────────────
+  - id: load_grid_load
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_grid_load_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/consumption/type=grid_load/year={{ inputs.year }}/*.parquet"
+
+  - id: load_residual_load
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_residual_load_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/consumption/type=residual_load/year={{ inputs.year }}/*.parquet"
+
+  - id: load_pumped_storage_consumption
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_pumped_storage_consumption_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/consumption/type=pumped_storage_consumption/year={{ inputs.year }}/*.parquet"
+
+  - id: delete_consumption_year
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      DELETE FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw.grid_consumption`
+      WHERE EXTRACT(YEAR FROM DATE(timestamp_utc)) = {{ inputs.year }}
+
+  - id: insert_consumption
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.grid_consumption`
+      (timestamp_utc, grid_load, residual_load, pumped_storage_consumption, date)
+      SELECT
+        TIMESTAMP(DATETIME(gl.datetime, 'Europe/Berlin')),
+        gl.grid_load,
+        rl.residual_load,
+        ps.pumped_storage_consumption,
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(gl.datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_grid_load_{{ inputs.year }}` gl
+      LEFT JOIN `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_residual_load_{{ inputs.year }}` rl
+        ON gl.datetime = rl.datetime
+      LEFT JOIN `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_pumped_storage_consumption_{{ inputs.year }}` ps
+        ON gl.datetime = ps.datetime
+      WHERE gl.datetime IS NOT NULL
+
+  - id: drop_tmp_consumption
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_grid_load_{{ inputs.year }}`;
+      DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_residual_load_{{ inputs.year }}`;
+      DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_pumped_storage_consumption_{{ inputs.year }}`;
+
+  # ── Prices ─────────────────────────────────────────────
+  - id: delete_prices_year
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      DELETE FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_prices`
+      WHERE EXTRACT(YEAR FROM DATE(timestamp_utc)) = {{ inputs.year }}
+
+  - id: load_prices_tmp
+    type: io.kestra.plugin.gcp.bigquery.LoadFromGcs
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    destinationTable: "{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_price_{{ inputs.year }}"
+    format: PARQUET
+    writeDisposition: WRITE_TRUNCATE
+    from:
+      - "gs://{{ kv('GCP_BUCKET_NAME') }}/raw/smard/price/type=day_ahead/year={{ inputs.year }}/*.parquet"
+
+  - id: insert_prices
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: |
+      INSERT INTO `{{ kv('GCP_PROJECT_ID') }}.smard_raw.electricity_prices`
+      (timestamp_utc, price_eur_mwh, price_type, date)
+      SELECT
+        TIMESTAMP(DATETIME(datetime, 'Europe/Berlin')),
+        price_eur_mwh,
+        'day_ahead',
+        FORMAT_DATE('%Y-%m-%d', DATE(DATETIME(datetime, 'Europe/Berlin')))
+      FROM `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_price_{{ inputs.year }}`
+      WHERE datetime IS NOT NULL
+
+  - id: drop_tmp_prices
+    type: io.kestra.plugin.gcp.bigquery.Query
+    projectId: "{{ kv('GCP_PROJECT_ID') }}"
+    serviceAccount: "{{ kv('GCP_CREDS') }}"
+    sql: "DROP TABLE IF EXISTS `{{ kv('GCP_PROJECT_ID') }}.smard_raw._tmp_price_{{ inputs.year }}`"
