@@ -1,0 +1,103 @@
+version: 2
+
+sources:
+  - name: smard_raw
+    description: Raw SMARD data from GCS
+    schema: smard_raw
+    
+    tables:
+      - name: electricity_generation
+        description: 15-minute electricity generation by energy type
+        columns:
+          - name: timestamp_utc
+            description: UTC timestamp
+            tests:
+              - not_null
+          - name: energy_type
+            description: Energy source (solar, wind, etc)
+            tests:
+              - not_null
+          - name: value_mwh
+            description: Generation in MWh
+            tests:
+              - not_null
+          - name: category
+            description: 'renewable | fossil | other'
+          - name: date
+            description: Local Berlin date string
+      
+      - name: grid_consumption
+        description: 15-minute grid consumption metrics
+        columns:
+          - name: timestamp_utc
+            tests:
+              - not_null
+          - name: grid_load
+            description: Total grid load in MWh
+            tests:
+              - not_null
+          - name: residual_load
+            description: Residual load (demand - renewables) in MWh
+      
+      - name: electricity_prices
+        description: 15-minute electricity prices
+        columns:
+          - name: timestamp_utc
+            tests:
+              - not_null
+          - name: price_eur_mwh
+            description: Day-ahead price in EUR/MWh
+            tests:
+              - not_null
+
+models:
+  - name: stg_generation
+    description: Staged generation data with time dimensions
+    columns:
+      - name: timestamp_utc
+        description: UTC timestamp
+        tests:
+          - not_null
+          - unique
+      - name: energy_type
+        tests:
+          - not_null
+      - name: generation_mwh
+        tests:
+          - not_null
+  
+  - name: stg_consumption
+    description: Staged consumption data
+    columns:
+      - name: timestamp_utc
+        tests:
+          - not_null
+  
+  - name: stg_prices
+    description: Staged price data with categorization
+    columns:
+      - name: timestamp_utc
+        tests:
+          - not_null
+
+  - name: mart_energy_mix
+    description: Joined energy generation + consumption + prices (incremental, 15min granularity)
+    columns:
+      - name: timestamp_utc
+        description: UTC timestamp (15min interval)
+        tests:
+          - not_null
+      - name: energy_type
+        description: Energy source
+        tests:
+          - not_null
+      - name: generation_mwh
+        description: Generation value in MWh
+        tests:
+          - not_null
+      - name: generation_share_pct
+        description: Generation as % of grid load
+      - name: price_eur_mwh
+        description: Day-ahead electricity price
+      - name: is_surplus
+        description: Flag if generation > residual load

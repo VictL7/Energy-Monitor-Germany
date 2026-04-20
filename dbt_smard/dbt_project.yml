@@ -1,0 +1,52 @@
+name: 'smard_dbt'
+version: '1.0.0'
+config-version: 2
+
+profile: 'smard_dbt'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  smard_dbt:
+    staging:
+      +materialized: table
+      +partition_by:
+        field: timestamp_utc
+        data_type: timestamp
+        granularity: day
+      
+    marts:
+      +materialized: table
+      
+      # Dimension table - no partitioning needed
+      dim_energy_types:
+        +materialized: table
+      
+      # Fact and incremental models with partitioning
+      fct_energy_balance:
+        +partition_by:
+          field: timestamp_utc
+          data_type: timestamp
+          granularity: day
+      
+      mart_energy_mix:
+        +materialized: incremental
+        +unique_key: [timestamp_utc, energy_type]
+        +partition_by:
+          field: timestamp_utc
+          data_type: timestamp
+          granularity: day
+        +on_schema_change: fail
+
+vars:
+  start_year: 2019
+  end_year: 2026

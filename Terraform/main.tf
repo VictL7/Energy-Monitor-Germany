@@ -141,6 +141,8 @@ resource "google_bigquery_table" "grid_consumption" {
       description = "Netzlast in MWh" },
     { name = "residual_load",  type = "FLOAT64",   mode = "NULLABLE",
       description = "Residuallast = Netzlast - Wind - Solar (SMARD-Berechnung)" },
+    { name = "pumped_storage_consumption", type = "FLOAT64", mode = "NULLABLE",
+      description = "Pumpspeicher Verbrauch in MWh" },
     { name = "date",           type = "STRING",    mode = "NULLABLE" },
   ])
 

@@ -1,0 +1,51 @@
+id: test_smard_connection
+namespace: energiewende
+
+description: 测试 SMARD API 连接和 GCP 认证是否正常
+
+tasks:
+  - id: test_api
+    type: io.kestra.plugin.scripts.python.Script
+    docker:
+      image: python:3.11-slim
+    beforeCommands:
+      - pip install requests --quiet
+    script: |
+      import requests
+
+      r = requests.get(
+          "https://www.smard.de/app/chart_data/4068/DE/index_quarterhour.json",
+          timeout=30
+      )
+      data = r.json()
+      timestamps = data.get('timestamps', [])
+      print(f"✅ SMARD API 正常，找到 {len(timestamps)} 个时间包")
+
+      import pandas as pd
+      first = pd.to_datetime(timestamps[0], unit='ms', utc=True)
+      last  = pd.to_datetime(timestamps[-1], unit='ms', utc=True)
+      print(f"   最早: {first}")
+      print(f"   最晚: {last}")
+
+  - id: test_gcp_auth
+    type: io.kestra.plugin.scripts.python.Script
+    docker:
+      image: python:3.11-slim
+    beforeCommands:
+      - pip install google-cloud-storage --quiet
+    env:
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: "{{ secret('GCP_SA_JSON') }}"
+    script: |
+      import os, json
+      from google.cloud import storage
+      from google.oauth2 import service_account
+
+      sa_info = json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS_JSON'])
+      creds = service_account.Credentials.from_service_account_info(sa_info)
+      client = storage.Client(credentials=creds)
+
+      bucket = client.bucket("zeta-medley-473321-r6-smard-lake")
+      blobs = list(client.list_blobs(bucket, max_results=5))
+      print(f"✅ GCP 认证正常，bucket 里有 {len(blobs)} 个文件")
+      for b in blobs:
+          print(f"   {b.name}")

@@ -1,0 +1,90 @@
+smard_dbt:
+  outputs:
+    dev:
+      dataset: smard_dbt
+      keyfile_json: &id001
+        auth_provider_x509_cert_url: https://www.googleapis.com/oauth2/v1/certs
+        auth_uri: https://accounts.google.com/o/oauth2/auth
+        client_email: energiewende-pipeline-sa@zeta-medley-473321-r6.iam.gserviceaccount.com
+        client_id: '117068489630710392839'
+        client_x509_cert_url: https://www.googleapis.com/robot/v1/metadata/x509/energiewende-pipeline-sa%40zeta-medley-473321-r6.iam.gserviceaccount.com
+        private_key: '-----BEGIN PRIVATE KEY-----
+
+          MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDJgT12gVh686ls
+
+          rc1bqS8ITc/7UdXV7YSzva+cEsz1UnlSYOA4B1ZQC/mPWlbDuLoTlRFk2ewQ99Hq
+
+          8beGMOC/PMS2MK7/M5jWCZZqiLnsgjspKAqvVyNCqiyW2aiYAXvu5l0yRALAmJmp
+
+          wtf4zFVflK3iMP0aRCAYRn5fGK5HRuFd3z5lsXRFHv1/2fWhy7vm2oX1h/OWTkPW
+
+          l408t1q379sjlNVPtOZmeLxJJcDz8w9WRVLkP5slyHm+mHKkl/beEkm0h8OTY07g
+
+          vZ4FKPcFWTR2a4TGcecHUEehPR8rNWyZJEPHBo2jQQ9d9QpfnXAQyeIoCwAsG8yG
+
+          PgeLNIknAgMBAAECggEAFB9IVHuxKsIHUrd+cN9Rt4oRsV6oNG8+F7bjAPptpjfg
+
+          rqXG7kFpUKAJgVO7o1rglhEGRiRu6vjcaRJPSeK6ps46NJli+FAePI2DjErwChqt
+
+          Lrx1aLISbtdQkZXVvKw1RJOTje/1uGbkvWucJpe9FMjjnllXBRb1f4cWmod769kO
+
+          N7umaEOg88DjRz1P9qj8vo6NHaiXLqKmNRqzJBBsIYjjCuVY3d5CJ0TBHwGilAav
+
+          HqQRU10jirXMd/eft22ZCSP8u/AU0tboBZxkqlhT5Xs4cebP0iAM4QGl8IK+hB3f
+
+          L4RsCCdYsjmUFxAp8QJ/Ya9tPmfwoUV33aWMV5+dgQKBgQDx355SBvnpsEIG2vCi
+
+          miuL5GibXNqf6OQXO4qbpIoJcciluG1adNrVB3bOUxltf5JodaMnlXdN+OMUccFz
+
+          jYssDgzfPrpjPJdr9RqjvDGeZCMaHCRCi1vlx+EOjFyxnZ5z1KPdlgvd7jaM3/uE
+
+          mppzFCQPz2LMpHKbsUTrt+NsgQKBgQDVRgxEP9AyLp44BeDjABP/IaELn1GfrCtq
+
+          3qXmg5leu12yA53HR92RZj9s7JJlRBjd5vGJ2xOG2+kz3ZuIHTzZQcWfCT2hoMvk
+
+          TvUhuZp0MetfhqV2fksvHCtqhNxl2j5XPTE5jlsYepH6fzdsul/REjVnGDR0BnlJ
+
+          bpGRIUxBpwKBgDVCd1s6nAdAP5nA1iIH7rTUK9CiJqX1o1wWSVQybA7eVj9fl/zG
+
+          JHWqOhf+pme9IqEL3kxWFjo+JsqWrfFi5pVh1qXF60b0zacBBsetJgPpqu0R604X
+
+          37l+ROluMO8PdReuaBLf+mb5EFv+6iRt4rqaYcJ1eRz0zSPJahK5oEOBAoGAGODz
+
+          +14qTkBL6qMc6b4Plxp4K9/o6KRv6CaS2cIOORPISUTMuftzKEvyKCWsqi14bSJM
+
+          mNU6gOfUW12FkCpA9+MJR5UPYHRedIKVa9q33sgX+eu+D4WKBbPWiLV49FSyIwEb
+
+          ZehqTf+2Wa9PatqO5Nen7R/Qtpwut9czGef1ek8CgYEA3ItFKegv0pU5GJAZa3gQ
+
+          4Ag62oKh5YLpfHsugfM2XuIf/nSHBo8GlNqj1tkH/HBS41FomBqV8rVwEVWManjb
+
+          4lhxRQsv6RmZxSq/oXZDy212GQ7ix6B3IbQRtyCT9KwnakNKtnNqdJV7i3CmY4IM
+
+          VjEjE8vlCPffIk/gNnj0ICI=
+
+          -----END PRIVATE KEY-----
+
+          '
+        private_key_id: af985876598b503c354897183264a09dadb3d649
+        project_id: zeta-medley-473321-r6
+        token_uri: https://oauth2.googleapis.com/token
+        type: service_account
+        universe_domain: googleapis.com
+      location: europe-west3
+      method: service-account-json
+      priority: interactive
+      project: zeta-medley-473321-r6
+      threads: 4
+      timeout_seconds: 300
+      type: bigquery
+    prod:
+      dataset: smard_dbt
+      keyfile_json: *id001
+      location: europe-west3
+      method: service-account-json
+      priority: batch
+      project: zeta-medley-473321-r6
+      threads: 8
+      timeout_seconds: 600
+      type: bigquery
+  target: dev

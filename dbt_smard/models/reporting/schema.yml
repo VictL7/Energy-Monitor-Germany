@@ -1,0 +1,357 @@
+version: 2
+
+models:
+  - name: rpt_daily_summary
+    description: |
+      日度能源汇总表 - Tableau KPI 仪表板用
+      粒度：1行 = 1天
+      行数：~2,700（2019-2026年4月）
+      更新频率：每天凌晨
+      用途：KPI卡片、日度趋势、月度对比
+    columns:
+      - name: date
+        description: 能源平衡日期
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份（1-12）
+      - name: quarter
+        description: 季度（1-4）
+      - name: week
+        description: 周数（1-53）
+      - name: day_of_week_num
+        description: 星期数字（1=周日，7=周六）
+      - name: day_of_week_name
+        description: 星期名称（中文）
+      - name: total_generation_mwh
+        description: 日总发电量（MWh）- 所有能源类型
+      - name: avg_hourly_generation_mwh
+        description: 小时平均发电量（MWh）
+      - name: max_hourly_generation_mwh
+        description: 日最大小时发电量（MWh）
+      - name: min_hourly_generation_mwh
+        description: 日最小小时发电量（MWh）
+      - name: stddev_generation_mwh
+        description: 发电量标准差（波动性）
+      - name: total_grid_load_mwh
+        description: 日总电力需求（MWh）
+      - name: avg_hourly_load_mwh
+        description: 小时平均电力需求（MWh）
+      - name: max_hourly_load_mwh
+        description: 日最大小时需求（MWh）
+      - name: min_hourly_load_mwh
+        description: 日最小小时需求（MWh）
+      - name: total_balance_gap_mwh
+        description: 日总平衡缺口（MWh）- 正值为盈余
+      - name: surplus_hours
+        description: 盈余的小时数（0-24）
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 24
+      - name: deficit_hours
+        description: 缺口的小时数（0-24）
+      - name: surplus_pct
+        description: 盈余比例（%）- 0 到 100
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: avg_supply_ratio
+        description: 平均供应比（发电/需求）
+      - name: avg_price_eur_mwh
+        description: 日平均电价（EUR/MWh）
+      - name: min_price_eur_mwh
+        description: 日最低电价（EUR/MWh）
+      - name: max_price_eur_mwh
+        description: 日最高电价（EUR/MWh）
+      - name: negative_price_hours
+        description: 负价格的小时数
+      - name: renewable_sufficient_hours
+        description: 风光充分供应的小时数（residual_load < 0）
+      - name: renewable_sufficient_pct
+        description: 风光充分比例（%）
+      - name: dbt_loaded_at
+        description: dbt 加载时间戳
+
+  - name: rpt_hourly_summary
+    description: |
+      小时能源汇总表 - Tableau 热力图/时间序列分析用
+      粒度：1行 = 1小时
+      行数：~26,500（2019-2026年4月）
+      更新频率：每天凌晨
+      用途：热力图、小时级细粒度分析、特定时段对比
+    columns:
+      - name: date
+        description: 能源平衡日期
+        tests:
+          - not_null
+      - name: hour_berlin
+        description: 柏林时区小时（0-23）
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 23
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份（1-12）
+      - name: quarter
+        description: 季度（1-4）
+      - name: week
+        description: 周数（1-53）
+      - name: day_of_week_num
+        description: 星期数字（1=周日，7=周六）
+      - name: day_of_week_name
+        description: 星期名称（中文）
+      - name: total_generation_mwh
+        description: 小时总发电量（MWh）
+      - name: total_grid_load_mwh
+        description: 小时电力需求（MWh）
+      - name: avg_residual_load_mwh
+        description: 残余负荷（MWh）= 需求 - 风光
+      - name: balance_gap_mwh
+        description: 能源缺口（MWh）- 正值为盈余
+      - name: supply_ratio
+        description: 供应比 = 发电 / 需求
+      - name: is_surplus
+        description: 是否盈余（1=盈余，0=缺口）
+      - name: avg_price_eur_mwh
+        description: 小时平均电价（EUR/MWh）
+      - name: supply_status
+        description: 供应状态（充盈/盈余/平衡/缺口）
+      - name: renewable_status
+        description: 可再生能源状态
+      - name: price_tier
+        description: 价格等级（负价格/低价/中价/高价/极高价）
+      - name: dbt_loaded_at
+        description: dbt 加载时间戳
+
+  - name: rpt_energy_mix_daily
+    description: |
+      能源类型日度分解表 - Tableau 能源结构对比用
+      粒度：1行 = 1天 × 1种能源（12种）
+      行数：~32,400（2.7K天 × 12种）
+      更新频率：每天凌晨
+      用途：堆积柱图、能源类型排序、可再生vs化石对比
+    columns:
+      - name: date
+        description: 能源平衡日期
+        tests:
+          - not_null
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份（1-12）
+      - name: quarter
+        description: 季度（1-4）
+      - name: week
+        description: 周数（1-53）
+      - name: day_of_week_name
+        description: 星期名称（中文）
+      - name: energy_type
+        description: 能源类型（12种）
+        tests:
+          - not_null
+      - name: category
+        description: 能源类别（renewable/nuclear/fossil/other）
+      - name: total_generation_mwh
+        description: 该能源日总发电量（MWh）
+      - name: avg_hourly_generation_mwh
+        description: 该能源小时平均发电量（MWh）
+      - name: max_hourly_generation_mwh
+        description: 该能源日最大小时发电量（MWh）
+      - name: data_points
+        description: 该天该能源的数据点数（应该是24）
+      - name: total_revenue_eur
+        description: 该能源日总收益（EUR）
+      - name: avg_share_pct
+        description: 该能源平均占比（0-1）
+      - name: share_pct_display
+        description: 该能源占比百分比（0-100）
+      - name: energy_category_priority
+        description: 能源类别优先级（1=可再生，2=核能，3=化石，4=其他）
+      - name: dbt_loaded_at
+        description: dbt 加载时间戳
+
+  - name: rpt_price_analysis
+    description: |
+      电价分析表 - Tableau 价格趋势分析用
+      粒度：小时级预计算价格指标
+      行数：~8,800（小时粒度）
+      更新频率：每天凌晨
+      用途：价格时序、分布直方图、热力图、负价格标记
+    columns:
+      - name: date
+        description: 能源平衡日期
+        tests:
+          - not_null
+      - name: hour_berlin
+        description: 柏林时区小时（0-23）
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份（1-12）
+      - name: avg_price_eur_mwh
+        description: 小时平均电价（EUR/MWh）
+      - name: min_price_eur_mwh
+        description: 小时最低电价（EUR/MWh）
+      - name: max_price_eur_mwh
+        description: 小时最高电价（EUR/MWh）
+      - name: daily_price_rank_high
+        description: 日内价格排名（高价从1开始）
+      - name: daily_price_rank_low
+        description: 日内价格排名（低价从1开始）
+      - name: monthly_avg_price
+        description: 月度平均电价（EUR/MWh）
+      - name: price_vs_monthly_avg
+        description: 相对月均价偏差（EUR/MWh）
+      - name: price_tier
+        description: 价格等级（负价格/极低价/低价/中价/高价/极高价）
+      - name: dbt_loaded_at
+        description: dbt 加载时间戳
+
+  - name: rpt_renewable_trend
+    description: |
+      可再生能源趋势表 - Tableau 绿能占比趋势用
+      粒度：按时间周期聚合
+      行数：~2,400（按周期聚合）
+      更新频率：每天凌晨
+      用途：绿能占比趋势线、年度对标、目标进度跟踪
+    columns:
+      - name: date
+        description: 能源平衡日期
+        tests:
+          - not_null
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份（1-12）
+      - name: quarter
+        description: 季度（1-4）
+      - name: renewable_gen_mwh
+        description: 日可再生能源总发电（MWh）
+      - name: total_gen_mwh
+        description: 日总发电（MWh）
+      - name: renewable_share_pct_display
+        description: 可再生占比百分比（0-100）
+      - name: renewable_share_7day_avg_pct
+        description: 7日移动平均占比（%）
+      - name: renewable_share_30day_avg_pct
+        description: 30日移动平均占比（%）
+      - name: monthly_renewable_avg_pct
+        description: 月度平均占比（%）
+      - name: yearly_renewable_avg_pct
+        description: 年度平均占比（%）
+      - name: daily_change_pct
+        description: 日环比变化（%）
+      - name: dbt_loaded_at
+        description: dbt 加载时间戳
+  - name: rpt_price_correlation
+    description: |
+      日度价格与绿电相关性分析 - Tableau 相关性研究用
+      粒度：1行 = 1天
+      行数：~2,700（2019-2026年4月）
+      更新频率：每天凌晨
+      用途：价格-绿电相关系数趋势、极端事件分析
+    columns:
+      - name: date
+        description: 日期
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份
+      - name: correlation_renewable_price
+        description: 绿电占比与电价的相关系数（-1到1）
+      - name: correlation_residual_price
+        description: 残差负荷与电价的相关系数（-1到1）
+      - name: avg_price_surplus_hours
+        description: 过剩时段平均电价（EUR/MWh）
+      - name: avg_price_deficit_hours
+        description: 缺口时段平均电价（EUR/MWh）
+      - name: negative_price_pct
+        description: 负电价占比（%）
+      - name: extreme_negative_price_hours
+        description: 极端负电价时刻（< -100 EUR/MWh）
+      - name: extreme_high_price_hours
+        description: 极端高价时刻（> 300 EUR/MWh）
+
+  - name: rpt_surplus_temporal_pattern
+    description: |
+      过剩时刻的时间模式分析 - Tableau 热力图/月份-小时分析用
+      粒度：1行 = 1个（月份 × 小时）组合
+      行数：~288（12月 × 24小时）
+      更新频率：每天凌晨
+      用途：过剩事件季节性和日间分布分析、最佳储能充电时段
+    columns:
+      - name: month_num
+        description: 月份数字（1-12）
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 12
+      - name: month_name
+        description: 月份名称
+      - name: hour_berlin
+        description: 柏林时区小时（0-23）
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 23
+      - name: time_period
+        description: 时间段（Night/Morning/Afternoon/Evening）
+      - name: surplus_15min_intervals
+        description: 过剩的15分钟时刻数
+      - name: surplus_rate_pct
+        description: 过剩发生率（%）
+      - name: avg_renewable_share_surplus
+        description: 过剩时段平均绿电占比
+      - name: negative_price_rate_in_surplus_pct
+        description: 过剩时段内负电价发生率（%）
+
+  - name: rpt_negative_price_analysis
+    description: |
+      负电价事件分析与趋势 - Tableau 负电价可视化用
+      粒度：1行 = 1天
+      行数：~2,700（2019-2026年4月）
+      更新频率：每天凌晨
+      用途：负电价发生频率、极端事件、趋势分析、利润机会
+    columns:
+      - name: date
+        description: 日期
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: 年份
+      - name: month
+        description: 月份
+      - name: negative_price_hours
+        description: 负电价的小时数
+      - name: negative_price_pct
+        description: 负电价占比（%）
+      - name: extreme_negative_price_hours
+        description: 极端负电价时刻（< -100 EUR/MWh）
+      - name: min_negative_price
+        description: 日最低电价（最负）
+      - name: avg_negative_price
+        description: 负电价平均值
+      - name: avg_renewable_share_negative_price
+        description: 负电价时段的平均绿电占比
+      - name: negative_price_in_surplus_pct
+        description: 负电价中有多少是过剩事件（%）
+      - name: negative_price_hours_7day_avg
+        description: 7日移动平均负电价时刻数
+      - name: day_rank_in_month_by_negative_price
+        description: 本月内负电价排名（1=最高）

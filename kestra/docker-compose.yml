@@ -1,0 +1,94 @@
+version: '3.8'
+     
+services:
+  kestra:
+    image: kestra/kestra:latest
+    user: "root"
+    restart: always
+    pull_policy: always
+    command: server standalone
+    volumes:
+      - ./kestra-data:/app/storage
+      - ./kestra-logs:/app/logs
+      - ./kestra-flows.yml:/app/flows/smard-data-pipeline.yml
+      - ../Data:/app/data
+      - ../scripts:/app/scripts
+      - ../keys:/app/keys
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      KESTRA_SECRET_GCP_SA_JSON: '{"type": "service_account", ...}'
+      KESTRA_CONFIGURATION: |
+        datasources:
+          postgres:
+            url: jdbc:postgresql://postgres:5432/kestra
+            driverClassName: org.postgresql.Driver
+            username: kestra
+            password: k3str4
+        kestra:
+          server:
+            basic-auth:
+              enabled: false
+            api:
+              authentication:
+                enabled: false
+          repository:
+            type: postgres
+          queue:
+            type: postgres
+          storage:
+            type: local
+            local:
+              basePath: "/app/storage"
+          url: http://localhost:8080
+          # 限制并发任务数量，防止资源耗尽
+          tasks:
+            thread: 4
+          workers:
+            - type: local
+              threads: 4
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    depends_on:
+      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    # 添加资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  postgres:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    environment:
+      POSTGRES_DB: kestra
+      POSTGRES_USER: kestra
+      POSTGRES_PASSWORD: k3str4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kestra"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # 添加资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+volumes:
+  postgres_data:
